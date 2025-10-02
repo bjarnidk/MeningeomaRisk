@@ -96,11 +96,23 @@ bin_B = lookup_bins(p_A, artifact["validation_B"]["reliability_bins"])
 
 # Time-to-surgery prediction
 months_pred = float(reg_model.predict(row_df)[0])
+
+# Format prediction
 if months_pred >= 180:
-    time_text = ">15 years"
+    time_text = ">180 months (>15 years, no surgery observed within follow-up)"
 else:
     years = months_pred / 12
     time_text = f"{months_pred:.0f} months (~{years:.1f} years)"
+
+# Confidence interval formatting
+ci_low = artifact["time_to_event_ci"]["low"]
+ci_high = artifact["time_to_event_ci"]["high"]
+
+if ci_high >= 180:
+    ci_text = f"{ci_low/12:.1f} years – >15 years"
+else:
+    ci_text = f"{ci_low/12:.1f} – {ci_high/12:.1f} years"
+
 
 ci_low = artifact["time_to_event_ci"]["low"]
 ci_high = artifact["time_to_event_ci"]["high"]
