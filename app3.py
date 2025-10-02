@@ -94,11 +94,13 @@ bin_A = lookup_bins(p_A, artifact["validation_A"]["reliability_bins"])
 bin_AB = lookup_bins(p_AB, artifact["validation_AB"]["reliability_bins"])
 bin_B = lookup_bins(p_A, artifact["validation_B"]["reliability_bins"])
 
+# -----------------------------
 # Time-to-surgery prediction
+# -----------------------------
 months_pred = float(reg_model.predict(row_df)[0])
 
-# Format prediction
-if months_pred >= 180:
+# Treat anything >=179.5 as censored
+if months_pred >= 179.5:
     time_text = ">180 months (>15 years, no surgery observed within follow-up)"
 else:
     years = months_pred / 12
@@ -108,16 +110,8 @@ else:
 ci_low = artifact["time_to_event_ci"]["low"]
 ci_high = artifact["time_to_event_ci"]["high"]
 
-if ci_high >= 180:
+if ci_high >= 179.5:
     ci_text = f"{ci_low/12:.1f} years – >15 years"
-else:
-    ci_text = f"{ci_low/12:.1f} – {ci_high/12:.1f} years"
-
-
-ci_low = artifact["time_to_event_ci"]["low"]
-ci_high = artifact["time_to_event_ci"]["high"]
-if ci_high >= 180:
-    ci_text = f"{ci_low/12:.1f} – >15 years"
 else:
     ci_text = f"{ci_low/12:.1f} – {ci_high/12:.1f} years"
 
@@ -161,6 +155,6 @@ For each patient entered, the app displays:
 - The observed event rates from calibration/validation cohorts.
 - An estimated **time to surgery** from a pooled regression model trained on all 617 patients.
 Predictions are censored at 180 months (15 years). 
-If the model predicts 180 months, it is displayed as **>15 years**. 
+If the model predicts 180 months, it is displayed as **>180 months (>15 years, no surgery observed within follow-up)**. 
 Confidence intervals are based on bootstrap resampling across the pooled dataset.
 """)
