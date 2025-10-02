@@ -110,10 +110,15 @@ else:
 ci_low = artifact["time_to_event_ci"]["low"]
 ci_high = artifact["time_to_event_ci"]["high"]
 
-if ci_high >= 179.5:
-    ci_text = f"{ci_low/12:.1f} years – >15 years"
+if months_pred >= 179.5:
+    # censored case: only report lower bound
+    ci_text = f"> {ci_low/12:.1f} years"
 else:
-    ci_text = f"{ci_low/12:.1f} – {ci_high/12:.1f} years"
+    if ci_high >= 179.5:
+        ci_text = f"{ci_low/12:.1f} years – >15 years"
+    else:
+        ci_text = f"{ci_low/12:.1f} – {ci_high/12:.1f} years"
+
 
 # -----------------------------
 # Layout
