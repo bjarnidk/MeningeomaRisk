@@ -9,9 +9,9 @@ import streamlit as st
 ARTIFACT_PATH = "meningioma_rf_models.joblib"
 artifact = joblib.load(ARTIFACT_PATH)
 
-model_A = artifact["calibrated_model_A"]
-model_AB = artifact["calibrated_model_AB"]
-reg_model = artifact["regression_model_AB"]
+model_A = artifact["cal_rf_A"]
+model_AB = artifact["cal_rf_AB"]
+reg_model = artifact["rf_reg"]
 feature_names = artifact["feature_names"]
 
 # -----------------------------
