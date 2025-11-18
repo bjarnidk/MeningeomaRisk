@@ -112,6 +112,25 @@ with col2:
         st.write(f"**Risk:** {pAB*100:.1f}%")
         st.caption(f"Observed pooled: {binAB['obs_rate']*100:.1f}% (n={binAB['n']})")
 
+st.markdown(f"""
+This tool is based on a Random Forest classifier with isotonic calibration. 
+The primary model was trained on **507 patients** from Center A and externally validated on **110 patients** from Center B, 
+where it achieved an AUC of {valB['auc']:.3f} and a Brier score of {valB['brier']:.3f}. 
+
+Calibration was assessed by grouping patients into ten probability bins. 
+Within each bin, predicted risks were compared to observed intervention rates, 
+and 95% confidence intervals were calculated using Wilson’s method. 
+The width of these intervals reflects the number of patients contributing to each bin. 
+
+For each patient entered, the app displays:
+- The predicted probability of intervention within 15 years (Center A and pooled models).
+- The observed event rates from calibration/validation cohorts.
+- An estimated **time to surgery** from a pooled regression model trained on all 617 patients.
+Predictions are censored at 180 months (15 years). 
+If the model predicts 180 months, it is displayed as **>180 months (>15 years, no surgery observed within follow-up)**. 
+Confidence intervals are based on bootstrap resampling across the pooled dataset.
+""")
+
 # -----------------------------
 # Calibration tables
 # -----------------------------
