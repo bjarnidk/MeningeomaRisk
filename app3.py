@@ -169,18 +169,24 @@ st.subheader("Calibration Tables")
 
 tab1, tab2, tab3 = st.tabs(["Center A (Internal)", "Center B (External)", "Pooled A+B"])
 
+def extract_pred_obs(bins):
+    df = pd.DataFrame(bins)[["mean_pred", "obs_rate"]].copy()
+    df.columns = ["Predicted probability", "Observed event rate"]
+    return df
+
 with tab1:
     st.write("**Calibration bins – Center A (training set)**")
-    dfA_bins = pd.DataFrame(artifact["validation_A"]["reliability_bins"])
-    st.dataframe(dfA_bins)
+    dfA = extract_pred_obs(artifact["validation_A"]["reliability_bins"])
+    st.dataframe(dfA)
 
 with tab2:
     st.write("**Calibration bins – Center B (external validation)**")
-    dfB_bins = pd.DataFrame(artifact["validation_B"]["reliability_bins"])
-    st.dataframe(dfB_bins)
+    dfB = extract_pred_obs(artifact["validation_B"]["reliability_bins"])
+    st.dataframe(dfB)
 
 with tab3:
     st.write("**Calibration bins – Pooled A+B model**")
-    dfAB_bins = pd.DataFrame(artifact["validation_AB"]["reliability_bins"])
-    st.dataframe(dfAB_bins)
+    dfAB = extract_pred_obs(artifact["validation_AB"]["reliability_bins"])
+    st.dataframe(dfAB)
+
 
