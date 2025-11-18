@@ -1,6 +1,5 @@
 import joblib
 import pandas as pd
-import numpy as np
 import streamlit as st
 
 # -----------------------------
@@ -9,13 +8,12 @@ import streamlit as st
 ARTIFACT_PATH = "meningioma_rf_models.joblib"
 artifact = joblib.load(ARTIFACT_PATH)
 
-model_A = artifact["cal_rf_A"]
-model_AB = artifact["cal_rf_AB"]
-reg_model = artifact["rf_reg"]
+model_A = artifact["model_A"]
+model_AB = artifact["model_AB"]
 feature_names = artifact["feature_names"]
 
 # -----------------------------
-# Location mapping
+# Location categories
 # -----------------------------
 location_map = {
     0: "infratentorial",
@@ -27,144 +25,104 @@ location_map = {
 # -----------------------------
 # Build feature row
 # -----------------------------
-def make_row(age, size_mm, location_code, epilepsy, ich_sympt, focal, calcified, edema, feature_names):
+def make_row(age, size_mm, loc_code, epilepsy, ich, focal, calcified, edema):
     row = {
         "age": age,
         "tumorsize": size_mm,
         "epilepsi": int(epilepsy),
-        "tryksympt": int(ich_sympt),
+        "tryksympt": int(ich),
         "focalsympt": int(focal),
         "calcified": int(calcified),
         "edema": int(edema),
     }
-    row_df = pd.DataFrame([row])
 
-    # zero out all location columns
-    for c in feature_names:
-        if c.startswith("location_"):
-            row_df[c] = 0
+    df = pd.DataFrame([row])
 
-    # set chosen location
-    chosen_col = f"location_{location_map[location_code]}"
-    if chosen_col in feature_names:
-        row_df[chosen_col] = 1
+    # Zero all location dummies
+    for col in feature_names:
+        if col.startswith("location_"):
+            df[col] = 0
 
-    # ensure all columns exist
-    for c in feature_names:
-        if c not in row_df.columns:
-            row_df[c] = 0
+    chosen = f"location_{location_map[loc_code]}"
+    if chosen in feature_names:
+        df[chosen] = 1
 
-    return row_df[feature_names]
+    # Ensure all features exist
+    for col in feature_names:
+        if col not in df.columns:
+            df[col] = 0
+
+    return df[feature_names]
 
 # -----------------------------
 # Find calibration bin
 # -----------------------------
-def lookup_bins(p, bins):
+def lookup_bin(prob, bins):
     for b in bins:
-        if b["p_min"] <= p <= b["p_max"]:
+        if b["p_min"] <= prob <= b["p_max"]:
             return b
     return None
 
 # -----------------------------
 # UI
 # -----------------------------
-st.set_page_config(page_title="Meningioma Risk (15y intervention)", layout="wide")
+st.set_page_config(layout="wide", page_title="Meningioma Intervention Risk")
 st.title("Meningioma 15-Year Intervention Risk")
 
-st.sidebar.header("Patient inputs")
-age_input = st.sidebar.number_input("Age (years)", 18, 110, 65)
-size_input = st.sidebar.number_input("Tumor size (mm)", 1, 100, 30)
+age = st.sidebar.number_input("Age", 18, 100, 65)
+size = st.sidebar.number_input("Tumor size (mm)", 1, 150, 25)
+loc = st.sidebar.selectbox("Location", list(location_map.keys()),
+                           format_func=lambda x: location_map[x].capitalize())
 
-sel_loc_code = st.sidebar.selectbox(
-    "Location",
-    options=list(location_map.keys()),
-    format_func=lambda x: {0:"Infratentorial",1:"Supratentorial",2:"Skull base",3:"Convexity"}[x]
-)
-
-yes_no = {0: "No", 1: "Yes"}
-
-epilepsy_in  = st.sidebar.selectbox("Epilepsy", [0,1], format_func=lambda x: yes_no[x])
-ich_in       = st.sidebar.selectbox("Intracranial Hypertension Symptoms", [0,1], format_func=lambda x: yes_no[x])
-focal_in     = st.sidebar.selectbox("Focal Neurologic Symptoms", [0,1], format_func=lambda x: yes_no[x])
-calcified_in = st.sidebar.selectbox(">50% of tumor calcified", [0,1], format_func=lambda x: yes_no[x], index=1)
-edema_in     = st.sidebar.selectbox("Edema", [0,1], format_func=lambda x: yes_no[x])
+yn = {0: "No", 1: "Yes"}
+epilepsy = st.sidebar.selectbox("Epilepsy", [0,1], format_func=lambda x: yn[x])
+ich = st.sidebar.selectbox("ICH symptoms", [0,1], format_func=lambda x: yn[x])
+focal = st.sidebar.selectbox("Focal symptoms", [0,1], format_func=lambda x: yn[x])
+calc = st.sidebar.selectbox(">50% calcified", [0,1], index=1, format_func=lambda x: yn[x])
+edema = st.sidebar.selectbox("Edema", [0,1], format_func=lambda x: yn[x])
 
 # -----------------------------
-# Prediction
+# Predictions
 # -----------------------------
-row_df = make_row(age_input, size_input, sel_loc_code, epilepsy_in, ich_in, focal_in, calcified_in, edema_in, feature_names)
+row = make_row(age, size, loc, epilepsy, ich, focal, calc, edema)
 
-p_A = float(model_A.predict_proba(row_df)[0, 1])
-p_AB = float(model_AB.predict_proba(row_df)[0, 1])
+pA = float(model_A.predict_proba(row)[0,1])
+pAB = float(model_AB.predict_proba(row)[0,1])
 
-# MATCHES YOUR MODEL STRUCTURE EXACTLY
-bin_A  = lookup_bins(p_A,  artifact["validation_A"]["reliability_bins"])
-bin_B  = lookup_bins(p_A,  artifact["validation_B"]["reliability_bins"])
-bin_AB = lookup_bins(p_AB, artifact["validation_AB"]["reliability_bins"])
-
-# -----------------------------
-# Time-to-surgery
-# -----------------------------
-months_pred = float(reg_model.predict(row_df)[0])
-
-if months_pred >= 179.5:
-    time_text = ">180 months (>15 years, no surgery observed)"
-else:
-    years = months_pred / 12
-    time_text = f"{months_pred:.0f} months (~{years:.1f} years)"
-
-ci_low = artifact["time_to_event_ci"]["low"]
-ci_high = artifact["time_to_event_ci"]["high"]
-
-if months_pred >= 179.5:
-    ci_text = f"> {ci_low/12:.1f} years"
-else:
-    if ci_high >= 179.5:
-        ci_text = f"{ci_low/12:.1f} years – >15 years"
-    else:
-        ci_text = f"{ci_low/12:.1f} – {ci_high/12:.1f} years"
+binA = lookup_bin(pA, artifact["validation_A"]["reliability_bins"])
+binB = lookup_bin(pA, artifact["validation_B"]["reliability_bins"])
+binAB = lookup_bin(pAB, artifact["validation_AB"]["reliability_bins"])
 
 # -----------------------------
-# Layout
+# Display
 # -----------------------------
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("Center A model (trained only on A)")
-    if bin_A:
-        st.write(f"**Risk:** {p_A*100:.1f}% (95% CI {bin_A['ci_low']*100:.1f}–{bin_A['ci_high']*100:.1f}%)")
-        st.caption(f"Observed in Center A: {bin_A['obs_rate']*100:.1f}% (n={bin_A['n']})")
-    if bin_B:
-        st.caption(f"Observed in Center B (external): {bin_B['obs_rate']*100:.1f}% (n={bin_B['n']})")
+    st.subheader("Center A (trained on A only)")
+    if binA:
+        st.write(f"**Risk:** {pA*100:.1f}%")
+        st.caption(f"Observed A: {binA['obs_rate']*100:.1f}% (n={binA['n']})")
+    if binB:
+        st.caption(f"Observed B (A→B): {binB['obs_rate']*100:.1f}% (n={binB['n']})")
 
 with col2:
-    st.subheader("Pooled model (trained on A+B)")
-    if bin_AB:
-        st.write(f"**Risk:** {p_AB*100:.1f}% (95% CI {bin_AB['ci_low']*100:.1f}–{bin_AB['ci_high']*100:.1f}%)")
-        st.caption(f"Observed in pooled A+B: {bin_AB['obs_rate']*100:.1f}% (n={bin_AB['n']})")
-    st.markdown(f"**Predicted time to surgery:** {time_text} (95% CI {ci_text})")
+    st.subheader("Pooled A+B model")
+    if binAB:
+        st.write(f"**Risk:** {pAB*100:.1f}%")
+        st.caption(f"Observed pooled: {binAB['obs_rate']*100:.1f}% (n={binAB['n']})")
 
 # -----------------------------
 # Calibration tables
 # -----------------------------
 st.markdown("---")
-st.subheader("Calibration Tables")
+st.subheader("Calibration tables")
 
-tab1, tab2, tab3 = st.tabs(["Center A (Internal)", "Center B (External)", "Pooled A+B"])
+tabA, tabB, tabAB = st.tabs(["Center A (internal)", "Center B (A→B)", "Pooled A+B"])
 
-def extract_pred_obs(bins):
-    df = pd.DataFrame(bins)[["mean_pred", "obs_rate"]].copy()
-    df.columns = ["Predicted probability", "Observed event rate"]
-    return df
+def extract(df): return pd.DataFrame(df)[["mean_pred", "obs_rate"]].rename(
+    columns={"mean_pred": "Predicted", "obs_rate": "Observed"})
 
-with tab1:
-    st.write("**Calibration bins – Center A (training set)**")
-    st.dataframe(extract_pred_obs(artifact["validation_A"]["reliability_bins"]))
-
-with tab2:
-    st.write("**Calibration bins – Center B (external validation)**")
-    st.dataframe(extract_pred_obs(artifact["validation_B"]["reliability_bins"]))
-
-with tab3:
-    st.write("**Calibration bins – Pooled A+B model**")
-    st.dataframe(extract_pred_obs(artifact["validation_AB"]["reliability_bins"]))
+with tabA: st.dataframe(extract(artifact["validation_A"]["reliability_bins"]))
+with tabB: st.dataframe(extract(artifact["validation_B"]["reliability_bins"]))
+with tabAB: st.dataframe(extract(artifact["validation_AB"]["reliability_bins"]))
