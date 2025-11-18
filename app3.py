@@ -112,6 +112,36 @@ with col2:
         st.write(f"**Risk:** {pAB*100:.1f}%")
         st.caption(f"Observed pooled: {binAB['obs_rate']*100:.1f}% (n={binAB['n']})")
 
+valB = artifact["validation_B"]
+
+st.markdown(
+    f"""
+### Model description and interpretation
+
+This tool is based on a Random Forest classifier with isotonic calibration.  
+The primary model was trained on **507 patients** from Center A and externally validated on  
+**110 patients** from Center B, where it achieved:
+
+- **AUC:** {valB['auc']:.3f}  
+- **Brier score:** {valB['brier']:.3f}
+
+Calibration was assessed by grouping patients into ten probability bins.  
+Within each bin, predicted risks were compared to observed intervention rates,  
+and 95% confidence intervals were calculated using Wilson’s method.
+
+The width of these intervals reflects how many patients contributed to the bin.  
+
+For each patient entered, the app displays:
+
+- Predicted probability of intervention within 15 years (Center A and pooled models)  
+- Observed event rates from calibration/validation cohorts  
+
+The time-to-surgery model is **not included** in this simplified version,  
+as regression models break cross-platform portability when deploying to Streamlit.  
+"""
+)
+
+
 # -----------------------------
 # Calibration tables
 # -----------------------------
