@@ -126,6 +126,91 @@ with col3:
     if binAB:
         st.caption(f"Observed pooled: {binAB['obs_rate']*100:.1f}% (n={binAB['n']})")
 
+st.markdown("---")
+st.subheader("Model description and interpretation")
+
+A_auc  = artifact["validation_AtoB"]["auc"]
+A_brier = artifact["validation_AtoB"]["brier"]
+
+B_auc  = artifact["validation_BtoA"]["auc"]
+B_brier = artifact["validation_BtoA"]["brier"]
+
+AB_auc = artifact["validation_AB"]["auc"]
+AB_brier = artifact["validation_AB"]["brier"]
+
+st.markdown(
+    f"""
+This application estimates **15-year intervention risk** for patients with meningioma  
+using three separately trained machine-learning models:
+
+---
+
+## **1. Model A — trained on Center A (507 patients)**  
+**Evaluated on Center B (110 patients).**
+
+This shows how a model trained at Center A generalizes to a completely independent cohort.
+
+**External validation (A→B):**  
+- **AUC:** {A_auc:.3f}  
+- **Brier score:** {A_brier:.3f}
+
+---
+
+## **2. Model B — trained on Center B (110 patients)**  
+**Evaluated on Center A (507 patients).**
+
+This evaluates generalization in the opposite direction and highlights differences  
+in patient mix and practice patterns between the two institutions.
+
+**External validation (B→A):**  
+- **AUC:** {B_auc:.3f}  
+- **Brier score:** {B_brier:.3f}
+
+---
+
+## **3. Model AB — pooled model (A+B = 617 patients)**  
+**Evaluated using 5-fold cross-validation.**
+
+This model uses all available data and typically provides the most stable predictions.
+
+**Cross-validated performance:**  
+- **AUC:** {AB_auc:.3f}  
+- **Brier score:** {AB_brier:.3f}
+
+---
+
+## **Calibration**
+For all three models, predicted probabilities are grouped into **10 equal-frequency bins**.  
+Each bin displays:
+
+- **Mean predicted probability**  
+- **Observed intervention rate**  
+- **Bin sample size (n)**  
+- **95% Wilson confidence interval**
+
+A model is considered **well-calibrated** when predicted and observed values align across bins.
+
+---
+
+## **How to interpret the results for your patient**
+For each model (A, B, and AB), the app shows:
+
+- The **predicted 15-year intervention risk**
+- The **observed event rate** in the calibration bin that matches your patient’s risk
+- How predictions differ between the institutions
+
+If all three models give similar risks, the patient-level estimate is stable  
+across populations. If they differ, it may reflect institutional differences  
+in patient profiles, treatment thresholds, or follow-up duration.
+
+---
+
+This tool supports research and clinical exploration but should not replace  
+clinical judgment or multidisciplinary decision-making.
+"""
+)
+
+
 
 # -----------------------------
 # Calibration tables
