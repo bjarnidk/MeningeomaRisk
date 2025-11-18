@@ -25,7 +25,7 @@ location_map = {
 }
 
 # -----------------------------
-# Helper to build feature row
+# Build feature row
 # -----------------------------
 def make_row(age, size_mm, location_code, epilepsy, ich_sympt, focal, calcified, edema, feature_names):
     row = {
@@ -38,19 +38,26 @@ def make_row(age, size_mm, location_code, epilepsy, ich_sympt, focal, calcified,
         "edema": int(edema),
     }
     row_df = pd.DataFrame([row])
+
+    # zero out all location columns
     for c in feature_names:
         if c.startswith("location_"):
             row_df[c] = 0
+
+    # set chosen location
     chosen_col = f"location_{location_map[location_code]}"
     if chosen_col in feature_names:
         row_df[chosen_col] = 1
+
+    # ensure all columns exist
     for c in feature_names:
         if c not in row_df.columns:
             row_df[c] = 0
+
     return row_df[feature_names]
 
 # -----------------------------
-# Helper: lookup calibration bin
+# Find calibration bin
 # -----------------------------
 def lookup_bins(p, bins):
     for b in bins:
@@ -59,7 +66,7 @@ def lookup_bins(p, bins):
     return None
 
 # -----------------------------
-# Streamlit UI
+# UI
 # -----------------------------
 st.set_page_config(page_title="Meningioma Risk (15y intervention)", layout="wide")
 st.title("Meningioma 15-Year Intervention Risk")
@@ -90,35 +97,32 @@ row_df = make_row(age_input, size_input, sel_loc_code, epilepsy_in, ich_in, foca
 p_A = float(model_A.predict_proba(row_df)[0, 1])
 p_AB = float(model_AB.predict_proba(row_df)[0, 1])
 
-bin_A = lookup_bins(p_A, artifact["validation_A"]["reliability_bins"])
+# MATCHES YOUR MODEL STRUCTURE EXACTLY
+bin_A  = lookup_bins(p_A,  artifact["validation_A"]["reliability_bins"])
+bin_B  = lookup_bins(p_A,  artifact["validation_B"]["reliability_bins"])
 bin_AB = lookup_bins(p_AB, artifact["validation_AB"]["reliability_bins"])
-bin_B = lookup_bins(p_A, artifact["validation_B"]["reliability_bins"])
 
 # -----------------------------
-# Time-to-surgery prediction
+# Time-to-surgery
 # -----------------------------
 months_pred = float(reg_model.predict(row_df)[0])
 
-# Treat anything >=179.5 as censored
 if months_pred >= 179.5:
-    time_text = ">180 months (>15 years, no surgery observed within follow-up)"
+    time_text = ">180 months (>15 years, no surgery observed)"
 else:
     years = months_pred / 12
     time_text = f"{months_pred:.0f} months (~{years:.1f} years)"
 
-# Confidence interval formatting
 ci_low = artifact["time_to_event_ci"]["low"]
 ci_high = artifact["time_to_event_ci"]["high"]
 
 if months_pred >= 179.5:
-    # censored case: only report lower bound
     ci_text = f"> {ci_low/12:.1f} years"
 else:
     if ci_high >= 179.5:
         ci_text = f"{ci_low/12:.1f} years – >15 years"
     else:
         ci_text = f"{ci_low/12:.1f} – {ci_high/12:.1f} years"
-
 
 # -----------------------------
 # Layout
@@ -140,30 +144,9 @@ with col2:
         st.caption(f"Observed in pooled A+B: {bin_AB['obs_rate']*100:.1f}% (n={bin_AB['n']})")
     st.markdown(f"**Predicted time to surgery:** {time_text} (95% CI {ci_text})")
 
-st.markdown("---")
-st.subheader("Model description and interpretation")
-
-valB = artifact["validation_B"]
-
-st.markdown(f"""
-This tool is based on a Random Forest classifier with isotonic calibration. 
-The primary model was trained on **507 patients** from Center A and externally validated on **110 patients** from Center B, 
-where it achieved an AUC of {valB['auc']:.3f} and a Brier score of {valB['brier']:.3f}. 
-
-Calibration was assessed by grouping patients into ten probability bins. 
-Within each bin, predicted risks were compared to observed intervention rates, 
-and 95% confidence intervals were calculated using Wilson’s method. 
-The width of these intervals reflects the number of patients contributing to each bin. 
-
-For each patient entered, the app displays:
-- The predicted probability of intervention within 15 years (Center A and pooled models).
-- The observed event rates from calibration/validation cohorts.
-- An estimated **time to surgery** from a pooled regression model trained on all 617 patients.
-Predictions are censored at 180 months (15 years). 
-If the model predicts 180 months, it is displayed as **>180 months (>15 years, no surgery observed within follow-up)**. 
-Confidence intervals are based on bootstrap resampling across the pooled dataset.
-""")
-
+# -----------------------------
+# Calibration tables
+# -----------------------------
 st.markdown("---")
 st.subheader("Calibration Tables")
 
@@ -176,17 +159,12 @@ def extract_pred_obs(bins):
 
 with tab1:
     st.write("**Calibration bins – Center A (training set)**")
-    dfA = extract_pred_obs(artifact["validation_A"]["reliability_bins"])
-    st.dataframe(dfA)
+    st.dataframe(extract_pred_obs(artifact["validation_A"]["reliability_bins"]))
 
 with tab2:
     st.write("**Calibration bins – Center B (external validation)**")
-    dfB = extract_pred_obs(artifact["validation_B"]["reliability_bins"])
-    st.dataframe(dfB)
+    st.dataframe(extract_pred_obs(artifact["validation_B"]["reliability_bins"]))
 
 with tab3:
     st.write("**Calibration bins – Pooled A+B model**")
-    dfAB = extract_pred_obs(artifact["validation_AB"]["reliability_bins"])
-    st.dataframe(dfAB)
-
-
+    st.dataframe(extract_pred_obs(artifact["validation_AB"]["reliability_bins"]))
