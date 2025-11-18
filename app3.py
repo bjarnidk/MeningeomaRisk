@@ -136,8 +136,7 @@ For each patient entered, the app displays:
 - Predicted probability of intervention within 15 years (Center A and pooled models)  
 - Observed event rates from calibration/validation cohorts  
 
-The time-to-surgery model is **not included** in this simplified version,  
-as regression models break cross-platform portability when deploying to Streamlit.  
+ The table below shows the probability bins, where model prediction and observed events can be evaluated side-by-side.
 """
 )
 
