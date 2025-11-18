@@ -163,3 +163,24 @@ Predictions are censored at 180 months (15 years).
 If the model predicts 180 months, it is displayed as **>180 months (>15 years, no surgery observed within follow-up)**. 
 Confidence intervals are based on bootstrap resampling across the pooled dataset.
 """)
+
+st.markdown("---")
+st.subheader("Calibration Tables")
+
+tab1, tab2, tab3 = st.tabs(["Center A (Internal)", "Center B (External)", "Pooled A+B"])
+
+with tab1:
+    st.write("**Calibration bins – Center A (training set)**")
+    dfA_bins = pd.DataFrame(artifact["validation_A"]["reliability_bins"])
+    st.dataframe(dfA_bins)
+
+with tab2:
+    st.write("**Calibration bins – Center B (external validation)**")
+    dfB_bins = pd.DataFrame(artifact["validation_B"]["reliability_bins"])
+    st.dataframe(dfB_bins)
+
+with tab3:
+    st.write("**Calibration bins – Pooled A+B model**")
+    dfAB_bins = pd.DataFrame(artifact["validation_AB"]["reliability_bins"])
+    st.dataframe(dfAB_bins)
+
