@@ -94,24 +94,35 @@ binB = lookup_bin(pA, artifact["validation_B"]["reliability_bins"])
 binAB = lookup_bin(pAB, artifact["validation_AB"]["reliability_bins"])
 
 # -----------------------------
-# Display
+# Display: 3 columns
 # -----------------------------
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 
+# ---- Center A ----
 with col1:
-    st.subheader("Center A (trained on A only)")
+    st.subheader("Center A (trained only on A)")
+    st.write(f"**Risk:** {pA*100:.1f}%")
     if binA:
-        st.write(f"**Risk:** {pA*100:.1f}%")
         st.caption(f"Observed A: {binA['obs_rate']*100:.1f}% (n={binA['n']})")
-    if binB:
-        st.caption(f"Observed B (A→B): {binB['obs_rate']*100:.1f}% (n={binB['n']})")
 
+# ---- A→B External ----
 with col2:
+    st.subheader("Center B (A→B external validation)")
+    st.write(f"**Risk using A-model:** {pA*100:.1f}%")
+    if binB:
+        st.caption(f"Observed B: {binB['obs_rate']*100:.1f}% (n={binB['n']})")
+
+# ---- Pooled ----
+with col3:
     st.subheader("Pooled A+B model")
+    st.write(f"**Risk:** {pAB*100:.1f}%")
     if binAB:
-        st.write(f"**Risk:** {pAB*100:.1f}%")
         st.caption(f"Observed pooled: {binAB['obs_rate']*100:.1f}% (n={binAB['n']})")
 
+
+# -----------------------------
+# Model description text
+# -----------------------------
 valB = artifact["validation_B"]
 
 st.markdown(
@@ -129,17 +140,14 @@ Calibration was assessed by grouping patients into ten probability bins.
 Within each bin, predicted risks were compared to observed intervention rates,  
 and 95% confidence intervals were calculated using Wilson’s method.
 
-The width of these intervals reflects how many patients contributed to the bin.  
-
 For each patient entered, the app displays:
 
-- Predicted probability of intervention within 15 years (Center A and pooled models)  
+- Predicted 15-year intervention risk (Center A and pooled models)  
 - Observed event rates from calibration/validation cohorts  
 
- The table below shows the probability bins, where model prediction and observed events can be evaluated side-by-side.
+Below you can explore the calibration tables for Center A, Center B, and pooled A+B.
 """
 )
-
 
 # -----------------------------
 # Calibration tables
@@ -147,11 +155,17 @@ For each patient entered, the app displays:
 st.markdown("---")
 st.subheader("Calibration tables")
 
-tabA, tabB, tabAB = st.tabs(["Center A (internal)", "Center B (A→B)", "Pooled A+B"])
+tabA, tabB, tabAB = st.tabs(["Center A (internal)", "Center B (A→B external)", "Pooled A+B"])
 
-def extract(df): return pd.DataFrame(df)[["mean_pred", "obs_rate"]].rename(
-    columns={"mean_pred": "Predicted", "obs_rate": "Observed"})
+def extract(df):
+    return pd.DataFrame(df)[["mean_pred", "obs_rate"]].rename(
+        columns={"mean_pred": "Predicted", "obs_rate": "Observed"})
 
-with tabA: st.dataframe(extract(artifact["validation_A"]["reliability_bins"]))
-with tabB: st.dataframe(extract(artifact["validation_B"]["reliability_bins"]))
-with tabAB: st.dataframe(extract(artifact["validation_AB"]["reliability_bins"]))
+with tabA:
+    st.dataframe(extract(artifact["validation_A"]["reliability_bins"]))
+
+with tabB:
+    st.dataframe(extract(artifact["validation_B"]["reliability_bins"]))
+
+with tabAB:
+    st.dataframe(extract(artifact["validation_AB"]["reliability_bins"]))
